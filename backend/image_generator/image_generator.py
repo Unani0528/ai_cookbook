@@ -14,6 +14,12 @@ from multiprocessing import Process, Queue
 url = 'https://sana.hanlab.ai/'
 
 def generateImage(prompt: str, result_file_name: str="test.png"):
+    """
+    주어진 프롬프트로 이미지 파일을 생성합니다.<p>
+    :param prompt: 이미지 생성에 사용할 프롬프트<p>
+    :param result_file_name: 생성된 이미지를 저장할 파일 이름<p>
+    :return: 성공 여부 (True/False)
+    """
     prefix = f"[{result_file_name}]"
     print(prefix, f"Generating image for prompt: {prompt}, output file: {result_file_name}")
     # prompt = 'A harsh cold look like stone staircase, digital art'
@@ -46,6 +52,7 @@ def generateImage(prompt: str, result_file_name: str="test.png"):
             pass
         except Exception as e:
             print(prefix, 'error:', e)
+            return False
 
     while True:
         time.sleep(1)
@@ -78,6 +85,30 @@ def generateImage(prompt: str, result_file_name: str="test.png"):
         os.remove(temp_webp_file)
     driver.quit()
     print(prefix, f"Image saved as {result_file_name}")
+    return True
+
+def generateImages(tasks: list):
+    """
+    여러 프롬프트와 파일 이름을 받아 병렬적으로 이미지를 생성합니다.<p>
+    :param tasks: 이미지 생성에 사용할 프롬프트와 파일 이름이 있는 튜플의 리스트. 예시: [("A monkey holding a banana", "monkey.png"), ("An old sign", "sign.png")]<p>
+    :return: 성공 여부 (True/False)
+    """
+    result = Queue()
+    threads = []
+    for task in tasks:
+        t = Process(target=generateImage, args=(task[0], task[1]))
+        t.start()
+        threads.append(t)
+    for t in threads:
+        t.join()
+    
+    result.put('STOP')
+    while True:
+        tmp = result.get()
+        if tmp == 'STOP':
+            break
+    print("All tasks completed.")
+    return True
 
 if __name__ == "__main__":
     tasks = [
@@ -92,19 +123,5 @@ if __name__ == "__main__":
         # ("A bustling marketplace in a fantasy world, digital art", "9.png"),
         # ("A peaceful beach at sunset, digital art", "10.png"),
     ]
-    result = Queue()
-    threads = []
-    for task in tasks:
-        t = Process(target=generateImage, args=(task[0], task[1]))
-        t.start()
-        threads.append(t)
-    for t in threads:
-        t.join()
-    
-    result.put('STOP')
-    total = 0
-    while True:
-        tmp = result.get()
-        if tmp == 'STOP':
-            break
-    print("All tasks completed.")
+    result = generateImages(tasks)
+    print("Result:", result)
