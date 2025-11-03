@@ -59,8 +59,11 @@ def generateImage(prompt: str, result_file_name: str="test.png"):
                 break
         if img_url is not None:
             break
+    # 이미지 저장 폴더 생성
+    print(prefix, "Creating image_results directory if not exists...")
+    os.makedirs("image_results", exist_ok=True)
 
-    temp_webp_file = f"{result_file_name}.webp"
+    temp_webp_file = f"image_results/{result_file_name}.webp"
 
     with open(temp_webp_file, "wb") as file:   # open in binary mode
         response = get(img_url)               # get request
@@ -70,7 +73,6 @@ def generateImage(prompt: str, result_file_name: str="test.png"):
     img = Image.open(temp_webp_file)
     print(prefix, "Converting WebP to PNG...")
     # PNG 형식으로 저장
-    os.makedirs("image_results", exist_ok=True)
     img.save("image_results/" + result_file_name, 'PNG')
     if os.path.exists(temp_webp_file):
         os.remove(temp_webp_file)
