@@ -75,6 +75,3 @@ Thumbs.db
 *.sublime-project
 *.sublime-workspace
 
-# Ignore virtual environment directories
-backend/ai_cookbook/image_generator/.venv
-backend/ai_cookbook/image_generator/image_results/
