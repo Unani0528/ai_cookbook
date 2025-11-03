@@ -20,50 +20,61 @@ def generateImage(prompt: str, result_file_name: str="test.png"):
     :param result_file_name: 생성된 이미지를 저장할 파일 이름<p>
     :return: 성공 여부 (True/False)
     """
+    # 로그 출력용 접두사
     prefix = f"[{result_file_name}]"
     print(prefix, f"Generating image for prompt: {prompt}, output file: {result_file_name}")
-    # prompt = 'A harsh cold look like stone staircase, digital art'
-    # result_file_name = 'test.png'
 
-    # Setup Chrome options (optional)
+    # Selenium 웹드라이버 설정 및 페이지 접속
     chrome_options = Options()
-
-    # chromedriver path input
     print(prefix, "waiting for page to load...")
     driver = webdriver.Chrome(options=chrome_options)
     driver.get(url)
-    # time.sleep(3)
-    # driver.implicitly_wait(3)
 
+    # 페이지 로딩 대기 및 요소 찾기
     while True:
         try:
+            # 페이지 로딩 대기
             time.sleep(1)
+            # 페이지 소스 가져오기
             html = driver.page_source
             soup = BeautifulSoup(html, features='html.parser')
             textarea_1 = driver.find_element(By.CSS_SELECTOR, 'textarea')
             button_1 = driver.find_element(By.CSS_SELECTOR, 'button.submit-button')
+            # 프롬프트 전송
             print(prefix, 'Sending prompt to the web page...')
             textarea_1.send_keys(prompt)
             button_1.click()
             print(prefix, 'Prompt sent, waiting for image generation...')
             break
         except NoSuchElementException:
+            # 요소를 찾지 못한 경우 재시도 (페이지 로딩중일 수 있음)
             print(prefix, 'Elements not found, retrying...')
             pass
         except Exception as e:
             print(prefix, 'error:', e)
             return False
 
+    # 이미지 생성 대기 및 다운로드
+    time_out = 0
     while True:
+        time_out += 1
+        # 1분 이상 이미지 생성이 지연되면 타임아웃 처리
+        if time_out > 60:
+            print(prefix, "Timeout waiting for image generation.")
+            driver.quit()
+            return False
+        # 1초 대기 후 페이지 소스 파싱
         time.sleep(1)
         soup = BeautifulSoup(driver.page_source, features='html.parser')
         img_tags = soup.find_all('img')
         img_url = None
+        # 생성된 이미지 URL 찾기
         for img in img_tags:
             if 'https://sana.hanlab.ai/gradio_api' in img.get('src', ''):
-                print(prefix, 'Image generated, downloading...')
+                print(prefix, 'Image URL found:', img['src'])
                 img_url = img['src']
                 break
+        # 이미지 URL을 찾았으면 루프 종료
         if img_url is not None:
             break
     # 이미지 저장 폴더 생성
@@ -71,16 +82,18 @@ def generateImage(prompt: str, result_file_name: str="test.png"):
     os.makedirs("image_results", exist_ok=True)
 
     temp_webp_file = f"image_results/{result_file_name}.webp"
-
+    print(prefix, "Downloading image from URL...")
+    # WebP 이미지 다운로드
     with open(temp_webp_file, "wb") as file:   # open in binary mode
         response = get(img_url)               # get request
         file.write(response.content)      # write to file
-    # WebP 이미지 열기
 
+    # WebP 이미지를 PNG 형식으로 저장
     img = Image.open(temp_webp_file)
     print(prefix, "Converting WebP to PNG...")
-    # PNG 형식으로 저장
     img.save("image_results/" + result_file_name, 'PNG')
+
+    # 임시 WebP 파일 삭제 및 드라이버 종료
     if os.path.exists(temp_webp_file):
         os.remove(temp_webp_file)
     driver.quit()
@@ -94,6 +107,8 @@ def generateImages(tasks: list):
     :return: 성공 여부 (True/False)
     """
     # result = Queue()
+
+    # 이미지 생성 작업을 병렬로 실행
     threads = []
     for task in tasks:
         t = Process(target=generateImage, args=(task[0], task[1]))
@@ -111,6 +126,7 @@ def generateImages(tasks: list):
     print("All tasks completed.")
     return True
 
+# 테스트용 메인 함수
 if __name__ == "__main__":
     tasks = [
         ("A bucket full of stars in space, digital art", "1.png"),
