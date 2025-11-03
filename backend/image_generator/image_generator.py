@@ -93,7 +93,7 @@ def generateImages(tasks: list):
     :param tasks: 이미지 생성에 사용할 프롬프트와 파일 이름이 있는 튜플의 리스트. 예시: [("A monkey holding a banana", "monkey.png"), ("An old sign", "sign.png")]<p>
     :return: 성공 여부 (True/False)
     """
-    result = Queue()
+    # result = Queue()
     threads = []
     for task in tasks:
         t = Process(target=generateImage, args=(task[0], task[1]))
@@ -102,11 +102,12 @@ def generateImages(tasks: list):
     for t in threads:
         t.join()
     
-    result.put('STOP')
-    while True:
-        tmp = result.get()
-        if tmp == 'STOP':
-            break
+    # result.put('STOP')
+    # while True:
+    #     tmp = result.get()
+    #     if tmp == 'STOP':
+    #         break
+
     print("All tasks completed.")
     return True
 
