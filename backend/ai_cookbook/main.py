@@ -48,7 +48,7 @@ def submit_and_redirect(prompt: str = ""):
     print("Translated prompt:", prompt)
     response = model.invoke([
         SystemMessage(content="You are a pro chef that can cook any food for various people who are in various circumstances. You should provide personal recipe for each person who wants their own recipe."),
-        HumanMessage(f"Please tell the sequence of recipe the following prompt in details as you can, please specify the amount required on ingredients based on 1 person serving food. if you think that question is not related to recipe, you must return an empty string. you don't need to list the ingredients. just description only. you must not use line break character. you must print only the result and must use separator with '###' when listing the each element of sequence.: {prompt}")
+        HumanMessage(f"Please tell the sequence of recipe the following prompt in details as you can, please specify the amount required on ingredients based on 1 person serving food. the reference is 'https://www.10000recipe.com/', if you think that question is not related to recipe, you must return an empty string. you don't need to list the ingredients. just description only. you must not use line break character. you must print only the result and must use separator with '###' when listing the each element of sequence.: {prompt}")
         ]).content
     print('summarized response:', response)
     words = response.split('###')
