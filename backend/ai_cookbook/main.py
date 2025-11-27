@@ -129,10 +129,6 @@ def generateImage(prompt: str, result_file_name: str="test.png"):
     :param result_file_name: 생성된 이미지를 저장할 파일 이름<p>
     :return: 성공 여부 (True/False)
     """
-    # 파일 이름에 사용할 수 없는 글자가 있을 경우 replace
-    invalid_chars = ['<', '>', ':', '"', '/', '\\', '|', '?', '*']
-    for char in invalid_chars:
-        result_file_name = result_file_name.replace(char, '-')
     # 로그 출력용 접두사
     prefix = f"[{result_file_name}]"
     print(prefix, f"Generating image for prompt: {prompt}, output file: {result_file_name}")
@@ -194,7 +190,9 @@ def generateImage(prompt: str, result_file_name: str="test.png"):
     print(prefix, "Creating image_results directory if not exists...")
     os.makedirs("static/image_results", exist_ok=True)
 
-    file_name = translate_to_korean(result_file_name.replace('.png', '')) + ';;;' + result_file_name.replace('.png', '')
+    file_name = translate_to_korean(result_file_name.replace('.png', ''))
+    # 파일 이름에 사용할 수 없는 문자 대체
+    file_name = file_name.replace('/', '_').replace('\\', '_').replace(':', '：').replace('*', '_').replace('?', '_').replace('"', '_').replace('<', '_').replace('>', '_').replace('|', '_')
 
     temp_webp_file = f"static/image_results/{file_name}"
     print(prefix, "Downloading image from URL...")
@@ -205,6 +203,12 @@ def generateImage(prompt: str, result_file_name: str="test.png"):
             file.write(response.content)      # write to file
     except Exception as e:
         print(prefix, "Error downloading image:", e)
+        try:
+            with open(temp_webp_file.split(';;;')[0], "wb") as file:   # open in binary mode
+                response = get(img_url)               # get request
+                file.write(response.content)      # write to file
+        except Exception as e2:
+            print(prefix, "Additional error handling failed:", e2)
 
     # # WebP 이미지를 PNG 형식으로 저장
     # img = Image.open(temp_webp_file)
