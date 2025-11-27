@@ -192,7 +192,7 @@ def generateImage(prompt: str, result_file_name: str="test.png"):
 
     file_name = translate_to_korean(result_file_name.replace('.png', ''))
     # 파일 이름에 사용할 수 없는 문자 대체
-    file_name = file_name.replace('/', '_').replace('\\', '_').replace(':', '：').replace('*', '_').replace('?', '_').replace('"', '_').replace('<', '_').replace('>', '_').replace('|', '_')
+    file_name = file_name.replace('/', ',').replace('\\', '_').replace(':', '：').replace('*', '_').replace('?', '_').replace('"', '_').replace('<', '_').replace('>', '_').replace('|', '_')
 
     temp_webp_file = f"static/image_results/{file_name}"
     print(prefix, "Downloading image from URL...")
