@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Cookbook - Success</title>
+    <!-- <link rel="stylesheet" href="/static/css/styles.css"> -->
+</head>
+
+<body>
+    <header>
+        <h1>AI Cookbook - 레시피</h1>
+    </header>
+    <main>
+        <section>
+            <p>이미지 생성이 완료되었습니다. <a href="/">처음 화면으로</a></p>
+            <hr>
+            {% for image_file_name in image_file_names %}
+            <img src="/static/image_results/{{ image_file_name }}" alt="{{ image_file_name }}" style="width: 400px; height: 400px;">
+            
+            {% set descriptions = image_file_name.split(';;;') %}
+            {% for description in descriptions %}
+            <p>{{ description }} </p>
+            {% endfor %}
+            <hr>
+            {% endfor %}
+            <a href="/">처음 화면으로</a>
+
+        </section>
+    </main>
+    <footer>
+    </footer>
+
+</html>

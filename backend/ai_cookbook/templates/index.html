@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Cookbook - Image Generator</title>
+    <!-- <link rel="stylesheet" href="/static/css/styles.css"> -->
+</head>
+
+<body>
+    <header>
+        <h1>AI Cookbook - 이미지 생성기</h1>
+    </header>
+    <main>
+        <section>
+            <h2>프롬프트를 입력하여 레시피 이미지와 설명을 생성합니다</h2>
+            <form method="get" action="/image_generator/generate/">
+                <label for="prompt">프롬프트 입력:</label>
+                <input type="text" id="prompt" name="prompt" required>
+                <button type="submit" id="generate_image_button">생성하기</button>
+            </form>
+        </section>
+    </main>
+    <footer>
+    </footer>
+</body>
+<script>
+    const inputField = document.getElementById('prompt');
+
+    const generateButton = document.getElementById('generate_image_button');
+    generateButton.addEventListener('click', function (event) {
+        generate_image();
+
+    });
+
+    function generate_image() {
+
+        if (!inputField.value || inputField.value.trim() === "") {
+            alert("입력란을 채워주세요");
+            return;
+        }
+        alert("이미지 생성이 시작되었습니다. 완료까지 잠시만 기다려주세요.");
+        inputField.style.display = 'none';
+        generateButton.style.display = 'none';
+        const inputField2 = document.createElement('input');
+        inputField2.id = 'prompt2';
+        inputField2.disabled = true;
+        inputField2.value = `${inputField.value} 레시피 생성중...`;
+        inputField.parentNode.insertBefore(inputField2, inputField);
+        const generateButton2 = document.createElement('button');
+        generateButton2.id = 'generate_image_button2';
+        generateButton2.disabled = true;
+        generateButton2.innerText = '생성하기';
+        generateButton.parentNode.insertBefore(generateButton2, generateButton);
+    }
+</script>
