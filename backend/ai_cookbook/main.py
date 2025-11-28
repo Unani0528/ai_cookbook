@@ -1,8 +1,11 @@
 from fastapi import FastAPI, BackgroundTasks
 from fastapi.responses import RedirectResponse
 import time
+import json
 
 from fastapi import FastAPI, Request
+from typing import Optional
+from pydantic import BaseModel
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from starlette.staticfiles import StaticFiles
@@ -12,8 +15,22 @@ import os
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from fastapi.middleware.cors import CORSMiddleware
+
+# 메시지 히스토리
+from langchain_core.chat_history import InMemoryChatMessageHistory
+from langchain_core.runnables.history import RunnableWithMessageHistory
 
 app = FastAPI()
+
+# 프론트엔드 출처(Vite dev server: 5173)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -29,12 +46,106 @@ model = ChatOpenAI(
     temperature=0.0,
 )
 
+class FormData(BaseModel):
+    allergies: str = "특이사항 없음"
+    cookingLevel: str = "beginner"
+    dishName: str = ""
+    preferences :str = "특이사항 없음"
+
+# 프롬프트 템플릿
+from langchain_core.prompts import ChatPromptTemplate
+
+generating = False
+result = {}
+
+@app.post("/api/generate-recipe")
+def generate_recipe(form_data: FormData):
+    global generating
+    global result
+    if generating:
+        return None
+    generating = True
+
+    prompt = f"""{form_data.dishName}을 만들고 싶은데 다음 조건이 있어. 요리 난이도는 {form_data.cookingLevel}이고, 
+                 알레르기 정보는 {form_data.allergies}야. 
+                 그리고 나의 취향은 {form_data.preferences} 이야. 
+                 이 정보를 바탕으로 나에게 맞는 레시피를 추천해줘."""
+
+
+    # 레시피 생성 시작
+    response = with_message_history.invoke([
+        SystemMessage(content="너는 취향에 따른 다양한 레시피를 선사할 수 있는 요리사야."),
+        HumanMessage(content=prompt + """
+        이 때, 다음 형식에 맞춰서 대답해줘. 최종 결과는 json 형식이 되었으면 좋겠어.
+        {
+            "title": "<레시피 제목>",
+            "servings": <인분(숫자만)>,
+            "cookTime": <조리 예상 시간(분 단위, 숫자만)>,
+            "ingredients": [
+                {
+                    "category": "주재료",
+                    "items": [<주재료 목록>]
+                },
+                {
+                    "category": "향신료",
+                    "items": [<향신료(주로 양념 등) 목록>]
+                }
+            ],
+            "steps": [
+                {
+                    "step": <조리 순서 번호(숫자만)>,
+                    "description": "<조리 순서 설명>",
+                    "image": "<조리 순서 이미지 URL>"
+                }
+            ],
+            "tips": [
+                "알레르기 정보: <입력받은 알레르기 정보를 고려하여 레시피에 적용된 사항>",
+                "초보자를 위한 팁: <초보자를 위한 팁>",
+                "보관 방법: <권장하는 보관 방법>"
+            ]
+        }
+    """)], config=config).content
+
+    print(response)
+
+    result['result'] = json.loads(response)
+
+    # 이미지 생성
+    english_prompt = translate_to_english(prompt)
+    img_url = generateImage(english_prompt)
+    print("Generated image URL:", img_url)
+    result['result']['image'] = img_url
+
+    for step in result['result']['steps']:
+        english_description = translate_to_english(step['description'])
+        img_url = generateImage(english_description)
+        print(f"Generated image URL for step {step['step']}:", img_url)
+        step['image'] = img_url
+
+    # 레시피 생성 끝
+    print("Process finished.")
+    generating = False
+    return result['result']
+
+# 메시지 히스토리 사용 예제
+store = {}
+
+def get_session_history(session_id: str) -> InMemoryChatMessageHistory:
+    if session_id not in store:
+        store[session_id] = InMemoryChatMessageHistory()
+    return store[session_id]
+
+with_message_history = RunnableWithMessageHistory(model, get_session_history)
+config = {"configurable": {"session_id": "user1234"}}
+
 # 이미지 생성 및 리다이렉트 엔드포인트
 @app.get("/image_generator/generate")
 def submit_and_redirect(prompt: str = ""):
     """
     Submits data, starts a background task, and redirects the user.
     """
+    return {"title": prompt}
+    original_prompt = prompt
     # 이미 이미지를 생성중인 경우 혹은 입력이 공백일 경우 리다이렉트
     if not prompt or prompt.strip() == "":
         return RedirectResponse(url="/", status_code=303)
@@ -60,23 +171,31 @@ def submit_and_redirect(prompt: str = ""):
     for word in words:
         tasks.append(('cooking recipe - ', word, f"{ ('%02d' if len(words) > 9 else '%d') % index}. {word}.png"))
         index += 1
-    generateImages(tasks)
+    generateImages(original_prompt, tasks)
     # generateImages([("A beautiful landscape", f"{prompt}.png"), ("A futuristic city", "city.png")])
     # Redirect to a "success" page or another relevant page
-    return RedirectResponse(url="/success", status_code=303)
 
-# 메인 화면
-@app.get("/", response_class=HTMLResponse)
-def main(request: Request):
-    return templates.TemplateResponse(
-        request=request, name="index.html"
-    )
+    return {"title":"테스트"}
 
-# 이미지 생성 후 결과 화면
-@app.get("/success", response_class=HTMLResponse)
-def success(request: Request):
-    image_file_names = [f for f in listdir('static/image_results') if isfile(join('static/image_results', f))]
-    return templates.TemplateResponse("success.html", context={"request": request, "image_file_names": image_file_names})
+    result = {}
+
+    result['title'] = prompt.split('###')[0]
+    return result
+    steps = []
+    for i, word in enumerate(words):
+        if word.strip() == "":
+            continue  # 빈 문자열은 건너뜀
+        step = {
+            'step': i + 1,
+            'title': word.strip(),
+            'image': f"{ ('%02d' if len(words) > 9 else '%d') % (i + 1)}. {word.strip()}.png"
+        }
+        steps.append(step)
+    result['steps'] = steps
+
+    return result
+
+    # return RedirectResponse(url="/success", status_code=303)
 
 # AI
 def translate_to_english(text: str) -> str:
@@ -121,8 +240,9 @@ from PIL import Image
 from multiprocessing import Process, Queue
 
 url = 'https://sana.hanlab.ai/'
+steps = []
 
-def generateImage(prompt: str, result_file_name: str="test.png"):
+def generateImage(prompt: str):
     """
     주어진 프롬프트로 이미지 파일을 생성합니다.<p>
     :param prompt: 이미지 생성에 사용할 프롬프트<p>
@@ -130,8 +250,8 @@ def generateImage(prompt: str, result_file_name: str="test.png"):
     :return: 성공 여부 (True/False)
     """
     # 로그 출력용 접두사
-    prefix = f"[{result_file_name}]"
-    print(prefix, f"Generating image for prompt: {prompt}, output file: {result_file_name}")
+    prefix = f"[{prompt}]"
+    print(prefix, f"Generating image for prompt: {prompt}")
 
     # Selenium 웹드라이버 설정 및 페이지 접속
     chrome_options = Options()
@@ -186,66 +306,24 @@ def generateImage(prompt: str, result_file_name: str="test.png"):
         # 이미지 URL을 찾았으면 루프 종료
         if img_url is not None:
             break
-    # 이미지 저장 폴더 생성
-    print(prefix, "Creating image_results directory if not exists...")
-    os.makedirs("static/image_results", exist_ok=True)
-
-    file_name = translate_to_korean(result_file_name.replace('.png', ''))
-    # 파일 이름에 사용할 수 없는 문자 대체
-    file_name = file_name.replace('/', ',').replace('\\', '_').replace(':', '：').replace('*', '_').replace('?', '_').replace('"', '_').replace('<', '_').replace('>', '_').replace('|', '_')
-
-    temp_webp_file = f"static/image_results/{file_name}"
-    print(prefix, "Downloading image from URL...")
-    # WebP 이미지 다운로드
-    try:
-        with open(temp_webp_file, "wb") as file:   # open in binary mode
-            response = get(img_url)               # get request
-            file.write(response.content)      # write to file
-    except Exception as e:
-        print(prefix, "Error downloading image:", e)
-        try:
-            with open(temp_webp_file.split(';;;')[0], "wb") as file:   # open in binary mode
-                response = get(img_url)               # get request
-                file.write(response.content)      # write to file
-        except Exception as e2:
-            print(prefix, "Additional error handling failed:", e2)
-
-    # # WebP 이미지를 PNG 형식으로 저장
-    # img = Image.open(temp_webp_file)
-    # print(prefix, "Converting WebP to PNG...")
-    # translated_file_name = translate_to_korean(result_file_name.replace('.png', ''))
-    # print(prefix, "Translated file name:", translated_file_name)
-    # img.save("static/image_results/" + translated_file_name + ';;;' + result_file_name.replace('.png', ''), 'PNG')
-
-    # # 임시 WebP 파일 삭제 및 드라이버 종료
-    # if os.path.exists(temp_webp_file):
-    #     os.remove(temp_webp_file)
     driver.quit()
-    print(prefix, f"Image saved as {file_name}")
-    return True
+    return img_url
 
-def generateImages(tasks: list):
-    """
-    여러 프롬프트와 파일 이름을 받아 병렬적으로 이미지를 생성합니다.<p>
-    :param tasks: 이미지 생성에 사용할 프롬프트와 파일 이름이 있는 튜플의 리스트. 예시: [("A monkey holding a banana", "monkey.png"), ("An old sign", "sign.png")]<p>
-    :return: 성공 여부 (True/False)
-    """
-    # result = Queue()
+# def generateImages(prompt:str, tasks: list):
+#     """
+#     여러 프롬프트와 파일 이름을 받아 병렬적으로 이미지를 생성합니다.<p>
+#     :param tasks: 이미지 생성에 사용할 프롬프트와 파일 이름이 있는 튜플의 리스트. 예시: [("A monkey holding a banana", "monkey.png"), ("An old sign", "sign.png")]<p>
+#     :return: 성공 여부 (True/False)
+#     """
+#     # result = Queue()
 
-    # 이미지 생성 작업을 병렬로 실행
-    threads = []
-    for task in tasks:
-        t = Process(target=generateImage, args=(task[0] + task[1], task[2]))
-        t.start()
-        threads.append(t)
-    for t in threads:
-        t.join()
-    
-    # result.put('STOP')
-    # while True:
-    #     tmp = result.get()
-    #     if tmp == 'STOP':
-    #         break
+#     # 이미지 생성 작업을 병렬로 실행
+#     threads = []
+#     for task in tasks:
+#         t = Process(target=generateImage, args=(task[0] + task[1], task[2]))
+#         t.start()
+#         threads.append(t)
+#     for t in threads:
+#         t.join()
 
-    print("All tasks completed.")
-    return True
+#     print("All tasks completed.")

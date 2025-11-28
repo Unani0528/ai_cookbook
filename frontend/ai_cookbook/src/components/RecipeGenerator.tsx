@@ -31,7 +31,8 @@ const RecipeGenerator: React.FC = () => {
     setStep('loading');
 
     try {
-      const response = await fetch('/api/generate-recipe', {
+      console.log(formData);
+      const response = await fetch('http://localhost:8000/api/generate-recipe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
