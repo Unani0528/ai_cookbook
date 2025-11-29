@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Send, ChefHat, User, Loader2 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import Header from './Header';
 import Footer from './Footer';
 
@@ -124,14 +127,111 @@ const ChatPage: React.FC = () => {
     }
   };
 
+  // 마크다운 렌더링 컴포넌트
+  const MarkdownContent: React.FC<{ content: string }> = ({ content }) => {
+    return (
+      <ReactMarkdown
+        components={{
+          // 코드 블록 처리
+          code({ node, inline, className, children, ...props }: any) {
+            const match = /language-(\w+)/.exec(className || '');
+            return !inline && match ? (
+              <SyntaxHighlighter
+                style={oneLight}
+                language={match[1]}
+                PreTag="div"
+                className="rounded-lg my-2 text-sm"
+                {...props}
+              >
+                {String(children).replace(/\n$/, '')}
+              </SyntaxHighlighter>
+            ) : (
+              <code
+                className="bg-gray-200 text-pink-600 px-1.5 py-0.5 rounded text-sm font-mono"
+                {...props}
+              >
+                {children}
+              </code>
+            );
+          },
+          // 헤딩 스타일
+          h1: ({ children }) => (
+            <h1 className="text-xl font-bold mt-4 mb-2">{children}</h1>
+          ),
+          h2: ({ children }) => (
+            <h2 className="text-lg font-bold mt-3 mb-2">{children}</h2>
+          ),
+          h3: ({ children }) => (
+            <h3 className="text-base font-bold mt-2 mb-1">{children}</h3>
+          ),
+          // 리스트 스타일
+          ul: ({ children }) => (
+            <ul className="list-disc list-inside my-2 space-y-1">{children}</ul>
+          ),
+          ol: ({ children }) => (
+            <ol className="list-decimal list-inside my-2 space-y-1">{children}</ol>
+          ),
+          li: ({ children }) => <li className="ml-2">{children}</li>,
+          // 단락 스타일
+          p: ({ children }) => <p className="my-1.5">{children}</p>,
+          // 강조 스타일
+          strong: ({ children }) => (
+            <strong className="font-semibold">{children}</strong>
+          ),
+          em: ({ children }) => <em className="italic">{children}</em>,
+          // 링크 스타일
+          a: ({ href, children }) => (
+            <a
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:text-blue-800 underline"
+            >
+              {children}
+            </a>
+          ),
+          // 인용문 스타일
+          blockquote: ({ children }) => (
+            <blockquote className="border-l-4 border-gray-300 pl-3 my-2 italic text-gray-700">
+              {children}
+            </blockquote>
+          ),
+          // 구분선
+          hr: () => <hr className="my-3 border-gray-300" />,
+          // 테이블 스타일
+          table: ({ children }) => (
+            <div className="overflow-x-auto my-2">
+              <table className="min-w-full border border-gray-300 rounded-lg">
+                {children}
+              </table>
+            </div>
+          ),
+          thead: ({ children }) => (
+            <thead className="bg-gray-100">{children}</thead>
+          ),
+          th: ({ children }) => (
+            <th className="border border-gray-300 px-3 py-1.5 text-left font-semibold">
+              {children}
+            </th>
+          ),
+          td: ({ children }) => (
+            <td className="border border-gray-300 px-3 py-1.5">{children}</td>
+          ),
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    );
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex flex-col">
+    <div className="h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex flex-col overflow-hidden">
       <Header />
 
-      <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col">
+      <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col min-h-0">
         {/* 페이지 제목 */}
-        <div className="text-center mb-6">
-          <div className="inline-flex items-center gap-2 bg-gradient-to-r from-cyan-500 to-blue-500 text-white px-6 py-3 rounded-full mb-4">
+        <div className="text-center mb-4 flex-shrink-0">
+          <div className="inline-flex items-center gap-2 bg-gradient-to-r from-cyan-500 to-blue-500 text-white px-6 py-3 rounded-full mb-2">
             <ChefHat className="w-5 h-5" />
             <span className="font-semibold">AI 레시피 챗봇</span>
           </div>
@@ -140,96 +240,105 @@ const ChatPage: React.FC = () => {
           </p>
         </div>
 
-        {/* 채팅 메시지 영역 */}
-        <div className="flex-1 bg-white rounded-2xl shadow-xl border border-gray-200 p-6 mb-4 overflow-y-auto">
-          <div className="space-y-4">
-            {messages.map((msg, index) => (
-              <div
-                key={index}
-                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
+        {/* 채팅 컨테이너 (채팅 + 입력이 하나의 박스) */}
+        <div className="flex-1 bg-white rounded-2xl shadow-xl border border-gray-200 flex flex-col min-h-0">
+          {/* 채팅 메시지 영역 - 내부 스크롤 */}
+          <div className="flex-1 overflow-y-auto p-6 min-h-0">
+            <div className="space-y-4">
+              {messages.map((msg, index) => (
                 <div
-                  className={`flex gap-3 max-w-[80%] ${
-                    msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'
-                  }`}
+                  key={index}
+                  className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
-                  {/* 아바타 */}
                   <div
-                    className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                      msg.role === 'user'
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white'
+                    className={`flex gap-3 max-w-[80%] ${
+                      msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'
                     }`}
                   >
-                    {msg.role === 'user' ? (
-                      <User className="w-5 h-5" />
-                    ) : (
+                    {/* 아바타 */}
+                    <div
+                      className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                        msg.role === 'user'
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white'
+                      }`}
+                    >
+                      {msg.role === 'user' ? (
+                        <User className="w-5 h-5" />
+                      ) : (
+                        <ChefHat className="w-5 h-5" />
+                      )}
+                    </div>
+
+                    {/* 메시지 내용 */}
+                    <div
+                      className={`rounded-2xl px-4 py-3 ${
+                        msg.role === 'user'
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-gray-100 text-gray-900'
+                      }`}
+                    >
+                      {msg.role === 'user' ? (
+                        <p className="whitespace-pre-wrap break-words">{msg.content}</p>
+                      ) : (
+                        <div className="prose prose-sm max-w-none break-words">
+                          <MarkdownContent content={msg.content} />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {/* 로딩 인디케이터 */}
+              {isLoading && (
+                <div className="flex justify-start">
+                  <div className="flex gap-3 max-w-[80%]">
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 bg-gradient-to-r from-cyan-500 to-blue-500 text-white">
                       <ChefHat className="w-5 h-5" />
-                    )}
-                  </div>
-
-                  {/* 메시지 내용 */}
-                  <div
-                    className={`rounded-2xl px-4 py-3 ${
-                      msg.role === 'user'
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-gray-100 text-gray-900'
-                    }`}
-                  >
-                    <p className="whitespace-pre-wrap break-words">{msg.content}</p>
+                    </div>
+                    <div className="bg-gray-100 rounded-2xl px-4 py-3">
+                      <Loader2 className="w-5 h-5 animate-spin text-gray-600" />
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              )}
 
-            {/* 로딩 인디케이터 */}
-            {isLoading && (
-              <div className="flex justify-start">
-                <div className="flex gap-3 max-w-[80%]">
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 bg-gradient-to-r from-cyan-500 to-blue-500 text-white">
-                    <ChefHat className="w-5 h-5" />
-                  </div>
-                  <div className="bg-gray-100 rounded-2xl px-4 py-3">
-                    <Loader2 className="w-5 h-5 animate-spin text-gray-600" />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div ref={messagesEndRef} />
-          </div>
-        </div>
-
-        {/* 입력 영역 */}
-        <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-4">
-          <div className="flex gap-3">
-            <input
-              type="text"
-              value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="메시지를 입력하세요..."
-              disabled={isLoading}
-              className="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent outline-none transition disabled:bg-gray-100"
-            />
-            <button
-              onClick={handleSendMessage}
-              disabled={!inputMessage.trim() || isLoading}
-              className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 disabled:from-gray-300 disabled:to-gray-400 text-white p-3 rounded-xl transition disabled:cursor-not-allowed"
-            >
-              <Send className="w-5 h-5" />
-            </button>
+              <div ref={messagesEndRef} />
+            </div>
           </div>
 
-          {/* 레시피 확정 버튼 */}
-          <div className="mt-3 pt-3 border-t border-gray-200">
-            <button
-              onClick={handleFinalizeRecipe}
-              disabled={messages.length === 0}
-              className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:from-gray-300 disabled:to-gray-400 text-white font-semibold py-3 px-6 rounded-xl shadow-lg hover:shadow-xl transition disabled:cursor-not-allowed"
-            >
-              이 레시피로 확정하기
-            </button>
+          {/* 입력 영역 - 같은 박스 내부, 하단 고정 */}
+          <div className="flex-shrink-0 border-t border-gray-200 p-4">
+            <div className="flex gap-3">
+              <input
+                type="text"
+                value={inputMessage}
+                onChange={(e) => setInputMessage(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="메시지를 입력하세요..."
+                disabled={isLoading}
+                className="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent outline-none transition disabled:bg-gray-100"
+              />
+              <button
+                onClick={handleSendMessage}
+                disabled={!inputMessage.trim() || isLoading}
+                className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 disabled:from-gray-300 disabled:to-gray-400 text-white p-3 rounded-xl transition disabled:cursor-not-allowed"
+              >
+                <Send className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* 레시피 확정 버튼 */}
+            <div className="mt-3 pt-3 border-t border-gray-200">
+              <button
+                onClick={handleFinalizeRecipe}
+                disabled={messages.length === 0}
+                className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:from-gray-300 disabled:to-gray-400 text-white font-semibold py-3 px-6 rounded-xl shadow-lg hover:shadow-xl transition disabled:cursor-not-allowed"
+              >
+                이 레시피로 확정하기
+              </button>
+            </div>
           </div>
         </div>
       </main>
