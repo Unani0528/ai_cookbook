@@ -155,6 +155,14 @@ class ChatService:
             return None
         return self._run_chain(session_id, message)
 
+    async def chat_stream(self, session_id: str, message: str):
+        """사용자 메시지 처리 (스트리밍)"""
+        if session_id not in self.sessions:
+            return  # async generator에서는 return None 대신 return만 사용
+
+        async for chunk in self._run_chain_stream(session_id, message):
+            yield chunk
+
     def _run_chain(self, session_id: str, message: str) -> Dict[str, Any]:
         """RAG 체인 실행"""
         profile = self.sessions[session_id]
@@ -189,6 +197,43 @@ class ChatService:
             }
 
         return {"response": response, "is_recipe": is_recipe}
+
+    async def _run_chain_stream(self, session_id: str, message: str):
+        """RAG 체인 실행 (스트리밍)"""
+        profile = self.sessions[session_id]
+        allergy_str = ", ".join(profile["allergy"]) if profile["allergy"] else "없음"
+
+        chain_with_history = RunnableWithMessageHistory(
+            self.base_rag_chain,
+            get_session_history=self._get_session_history,
+            input_messages_key="question",
+            history_messages_key="chat_history",
+        )
+
+        config = {"configurable": {"session_id": session_id}}
+
+        # 전체 응답을 모아서 나중에 히스토리에 저장
+        full_response = ""
+
+        async for chunk in chain_with_history.astream(
+            {
+                "question": message,
+                "allergy": allergy_str,
+                "user_profile": profile["preferences"],
+                "user_level": profile["cooking_level"],
+            },
+            config=config,
+        ):
+            full_response += chunk
+            yield chunk
+
+        # 스트리밍 완료 후 레시피 확인 및 저장
+        is_recipe = self._is_recipe_response(full_response)
+        if is_recipe:
+            self.sessions[session_id]["last_recipe"] = {
+                "content": full_response,
+                "name": self._extract_recipe_name(full_response),
+            }
 
     def get_chat_history(self, session_id: str) -> Optional[List[Dict[str, str]]]:
         if session_id not in self.chat_histories:

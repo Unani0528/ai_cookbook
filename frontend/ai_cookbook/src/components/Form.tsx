@@ -64,8 +64,8 @@ const Form: React.FC<FormProps> = ({ formData, onInputChange, onCookingLevelChan
                   }`}
                 >
                   {level === 'beginner' && '초보'}
-                  {level === 'intermediate' && '중급'}
-                  {level === 'advanced' && '고급'}
+                  {level === 'intermediate' && '중수'}
+                  {level === 'advanced' && '고수'}
                 </button>
               ))}
             </div>
@@ -123,7 +123,7 @@ const Form: React.FC<FormProps> = ({ formData, onInputChange, onCookingLevelChan
           {isLoading ? (
             <>
               <Loader2 className="w-5 h-5 animate-spin" />
-              <span>세션 생성 중...</span>
+              <span>레시피 생성 중...</span>
             </>
           ) : (
             <>
