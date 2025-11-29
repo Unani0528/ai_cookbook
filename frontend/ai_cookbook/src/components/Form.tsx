@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles, AlertCircle } from 'lucide-react';
+import { Sparkles, AlertCircle, Loader2 } from 'lucide-react';
 import type { RecipeFormData } from './types';
 
 interface FormProps {
@@ -7,9 +7,10 @@ interface FormProps {
   onInputChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
   onCookingLevelChange: (level: 'beginner' | 'intermediate' | 'advanced') => void;
   onSubmit: () => void;
+  isLoading?: boolean;
 }
 
-const Form: React.FC<FormProps> = ({ formData, onInputChange, onCookingLevelChange, onSubmit }) => {
+const Form: React.FC<FormProps> = ({ formData, onInputChange, onCookingLevelChange, onSubmit, isLoading }) => {
   return (
     <div className="max-w-3xl mx-auto">
       <div className="text-center mb-12">
@@ -116,11 +117,20 @@ const Form: React.FC<FormProps> = ({ formData, onInputChange, onCookingLevelChan
 
         <button
           onClick={onSubmit}
-          disabled={!formData.dishName.trim()}
+          disabled={!formData.dishName.trim() || isLoading}
           className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed text-white font-bold py-4 px-6 rounded-xl shadow-lg hover:shadow-xl transition duration-200 flex items-center justify-center gap-2"
         >
-          <Sparkles className="w-5 h-5" />
-          <span>AI 레시피 생성하기</span>
+          {isLoading ? (
+            <>
+              <Loader2 className="w-5 h-5 animate-spin" />
+              <span>세션 생성 중...</span>
+            </>
+          ) : (
+            <>
+              <Sparkles className="w-5 h-5" />
+              <span>AI 레시피 생성하기</span>
+            </>
+          )}
         </button>
       </div>
     </div>
