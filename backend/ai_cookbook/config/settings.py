@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = False  # 환경 변수 대소문자 구분 안 함
+        extra = "ignore"  # 정의되지 않은 환경 변수 무시
 
 
 settings = Settings()
