@@ -3,7 +3,9 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 import logging
+import json
 
 from dotenv import load_dotenv
 
@@ -109,6 +111,35 @@ async def chat(session_id: str, request: ChatRequest):
         response=result["response"],
         is_recipe=result["is_recipe"],
     )
+
+
+@app.post("/recipeChat/chat/{session_id}/stream")
+async def chat_stream(session_id: str, request: ChatRequest):
+    """
+    2페이지에서 호출 (스트리밍 버전)
+    - 사용자와 대화하며 레시피 수정/추천 (실시간 스트리밍)
+    """
+    if chat_service is None:
+        raise HTTPException(
+            status_code=503,
+            detail="ChatService is not available. Please ensure Qdrant is running at localhost:6333"
+        )
+
+    async def generate():
+        try:
+            async for chunk in chat_service.chat_stream(session_id=session_id, message=request.message):
+                # Server-Sent Events (SSE) 형식으로 전송
+                yield f"data: {json.dumps({'chunk': chunk}, ensure_ascii=False)}\n\n"
+            # 스트리밍 종료 신호
+            yield f"data: {json.dumps({'done': True}, ensure_ascii=False)}\n\n"
+        except Exception as e:
+            logger.error(f"Streaming error: {e}")
+            yield f"data: {json.dumps({'error': str(e)}, ensure_ascii=False)}\n\n"
+
+    if session_id not in chat_service.sessions:
+        raise HTTPException(status_code=404, detail="세션을 찾을 수 없습니다.")
+
+    return StreamingResponse(generate(), media_type="text/event-stream")
 
 
 @app.get("/recipeChat/chat/{session_id}/history", response_model=ChatHistoryResponse)
