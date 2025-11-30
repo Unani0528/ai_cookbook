@@ -36,7 +36,7 @@ export default function RecipeResultPage() {
             <img
               src={recipe.image}
               alt={recipe.title}
-              className="w-full h-64 object-cover rounded-lg mb-6"
+              className="w-full h-auto rounded-lg mb-6"
             />
           )}
 
@@ -79,7 +79,7 @@ export default function RecipeResultPage() {
                     <img
                       src={step.image}
                       alt={`Step ${step.step}`}
-                      className="w-full h-48 object-cover rounded-lg mt-2"
+                      className="w-full h-auto rounded-lg mt-2"
                     />
                   )}
                 </div>
