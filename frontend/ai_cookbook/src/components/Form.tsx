@@ -102,6 +102,12 @@ const Form: React.FC<FormProps> = ({ formData, onInputChange, onCookingLevelChan
               name="dishName"
               value={formData.dishName}
               onChange={onInputChange}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter' && formData.dishName.trim() && !isLoading) {
+                  e.preventDefault();
+                  onSubmit();
+                }
+              }}
               placeholder="예: 비건 칠리, 김치찌개, 파스타"
               className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition text-lg"
             />
