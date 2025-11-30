@@ -113,12 +113,14 @@ const ChatPage: React.FC = () => {
       }
 
       const data = await response.json();
+      console.log("서버에서 받은 레시피:", data)
 
       // 3페이지로 이동 (최종 레시피 페이지)
       navigate('/recipe-result', {
         state: {
           sessionId,
           recipe: data,
+          difficulty: data.difficulty,
         },
       });
     } catch (error) {

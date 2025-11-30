@@ -3,14 +3,13 @@ from typing import Dict, Any
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from models.recipe import RecipeRequest
-
+from models.recipe import FinalRecipeRequest
 
 class RecipeGenerator:
     def __init__(self, llm_with_history: RunnableWithMessageHistory):
         self.llm_with_history = llm_with_history
 
-    async def generate(self, request: RecipeRequest, image_gen, translator) -> Dict[str, Any]:
+    async def generate(self, request: FinalRecipeRequest, image_gen, translator) -> Dict[str, Any]:
         """레시피 생성 + 이미지 생성"""
         prompt = self._build_prompt(request)
 
@@ -36,7 +35,7 @@ class RecipeGenerator:
 
         return recipe_data
 
-    def _build_prompt(self, request: RecipeRequest) -> str:
+    def _build_prompt(self, request: FinalRecipeRequest) -> str:
         return f"""{request.dishName}을 만들고 싶은데 다음 조건이 있어. 요리 난이도는 {request.cookingLevel}이고,
 알레르기 정보는 {request.allergies}야.
 그리고 나의 취향은 {request.preferences} 이야.

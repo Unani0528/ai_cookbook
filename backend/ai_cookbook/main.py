@@ -21,6 +21,7 @@ from models.recipe import (
     ChatHistoryResponse,
 )
 from services.chat_service import ChatService
+from services.recipe_generator import RecipeGenerator
 
 load_dotenv()
 
@@ -174,10 +175,39 @@ async def finalize_recipe(session_id: str, request: FinalRecipeRequest):
     )
     if result is None:
         raise HTTPException(status_code=404, detail="세션을 찾을 수 없습니다.")
+    content = result['recipe_content']
+    
+    # content = {
+    #         "title": "레시피 제목",
+    #         "servings": 3,
+    #         "cookTime": 30,
+    #         "ingredients": [
+    #             {
+    #                 "category": "주재료",
+    #                 "items": ["주재료1", "주재료2"]
+    #             },
+    #             {
+    #                 "category": "향신료",
+    #                 "items": ["향신료1", "향신료2"]
+    #             }],
+    #             "steps": [
+    #                 {
+    #                     "step": 3,
+    #                     "description": "<조리 순서 설명>",
+    #                     "image": "<조리 순서 이미지 URL>"
+    #                 }
+    #             ],
+    #         "tips": [
+    #             "알레르기 정보: <입력받은 알레르기 정보를 고려하여 레시피에 적용된 사항>",
+    #             "초보자를 위한 팁: <초보자를 위한 팁>",
+    #             "보관 방법: <권장하는 보관 방법>"
+    #             ]
+    #         }
+
     return FinalRecipeResponse(
         session_id=session_id,
         recipe_name=result["recipe_name"],
-        recipe_content=result["recipe_content"],
+        recipe_content=content,
         image_prompt=result["image_prompt"],
         is_finalized=True,
     )
