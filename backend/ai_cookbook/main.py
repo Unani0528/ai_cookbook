@@ -70,7 +70,7 @@ async def lifespan(app: FastAPI):
         with_message_history = RunnableWithMessageHistory(model, get_session_history)
         image_gen = ImageGenerator()
         english_translator = EnglishTranslator(model)
-        recipe_gen = RecipeGenerator(with_message_history)
+        recipe_gen = RecipeGenerator(with_message_history, model)
         logger.info("RecipeGenerator services initialized successfully")
     except Exception as e:
         logger.error(f"Failed to initialize RecipeGenerator: {e}")
