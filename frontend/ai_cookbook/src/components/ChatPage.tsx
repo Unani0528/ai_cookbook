@@ -12,6 +12,13 @@ interface Message {
   content: string;
 }
 
+interface RecipeFormData {
+  dishName: string;
+  allergies: string;
+  cookingLevel: string;
+  preferences: string;
+}
+
 const ChatPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -21,10 +28,15 @@ const ChatPage: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [formData, setFormData] = useState<RecipeFormData | null>(null);
 
-  // 세션 ID 가져오기 (1페이지에서 전달받음)
+  // 세션 ID 및 formData 가져오기 (1페이지에서 전달받음)
   useEffect(() => {
-    const state = location.state as { sessionId?: string; initialMessage?: string };
+    const state = location.state as {
+      sessionId?: string;
+      initialMessage?: string;
+      formData?: RecipeFormData;
+    };
 
     if (!state?.sessionId) {
       alert('세션 정보가 없습니다. 처음부터 다시 시작해주세요.');
@@ -33,6 +45,9 @@ const ChatPage: React.FC = () => {
     }
 
     setSessionId(state.sessionId);
+    if (state.formData) {
+      setFormData(state.formData);
+    }
 
     // 초기 메시지가 있으면 추가
     if (state.initialMessage) {
@@ -99,33 +114,46 @@ const ChatPage: React.FC = () => {
 
   // 레시피 확정 버튼
   const handleFinalizeRecipe = async () => {
-    if (!sessionId) return;
+    if (!formData) {
+      alert('레시피 정보가 없습니다. 처음부터 다시 시작해주세요.');
+      navigate('/');
+      return;
+    }
+
+    setIsLoading(true);
 
     try {
-      const response = await fetch(`http://localhost:8000/recipeChat/finalize/${sessionId}`, {
+      // /api/generate-recipe 엔드포인트 호출
+      const response = await fetch('http://localhost:8000/api/generate-recipe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_confirmation: '레시피를 확정합니다.' }),
+        body: JSON.stringify({
+          dishName: formData.dishName,
+          allergies: formData.allergies || '특이사항 없음',
+          cookingLevel: formData.cookingLevel || 'beginner',
+          preferences: formData.preferences || '특이사항 없음',
+        }),
       });
 
       if (!response.ok) {
-        throw new Error('레시피 확정 실패');
+        throw new Error('레시피 생성 실패');
       }
 
       const data = await response.json();
-      console.log("서버에서 받은 레시피:", data)
+      console.log("서버에서 받은 레시피:", data);
 
       // 3페이지로 이동 (최종 레시피 페이지)
       navigate('/recipe-result', {
         state: {
           sessionId,
           recipe: data,
-          difficulty: data.difficulty,
         },
       });
     } catch (error) {
-      console.error('레시피 확정 오류:', error);
-      alert('레시피 확정 중 오류가 발생했습니다.');
+      console.error('레시피 생성 오류:', error);
+      alert('레시피 생성 중 오류가 발생했습니다.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -335,10 +363,11 @@ const ChatPage: React.FC = () => {
             <div className="mt-3 pt-3 border-t border-gray-200">
               <button
                 onClick={handleFinalizeRecipe}
-                disabled={messages.length === 0}
-                className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:from-gray-300 disabled:to-gray-400 text-white font-semibold py-3 px-6 rounded-xl shadow-lg hover:shadow-xl transition disabled:cursor-not-allowed"
+                disabled={messages.length === 0 || isLoading}
+                className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:from-gray-300 disabled:to-gray-400 text-white font-semibold py-3 px-6 rounded-xl shadow-lg hover:shadow-xl transition disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                이 레시피로 확정하기
+                {isLoading && <Loader2 className="w-5 h-5 animate-spin" />}
+                {isLoading ? '레시피 생성 중...(이 작업은 1~2분 정도 소요될 수 있습니다.)' : '이 레시피로 확정하기'}
               </button>
             </div>
           </div>

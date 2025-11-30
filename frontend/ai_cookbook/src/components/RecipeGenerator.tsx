@@ -52,11 +52,12 @@ const RecipeGenerator: React.FC = () => {
 
       const data = await response.json();
 
-      // 채팅 페이지로 이동 (세션 ID와 초기 메시지 전달)
+      // 채팅 페이지로 이동 (세션 ID, 초기 메시지, formData 전달)
       navigate('/chat', {
         state: {
           sessionId: data.session_id,
           initialMessage: data.initial_message,
+          formData: formData,
         },
       });
     } catch (error) {

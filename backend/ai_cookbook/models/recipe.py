@@ -85,3 +85,13 @@ class FinalRecipeResponse(BaseModel):
     recipe_content: str = Field(description="레시피 전체 내용")
     image_prompt: str = Field(description="이미지 생성용 프롬프트")
     is_finalized: bool = Field(default=False, description="확정 여부")
+
+
+# ============ 레시피 생성 API (원본) ============
+
+class RecipeRequest(BaseModel):
+    """프론트엔드와 호환되는 RecipeRequest (camelCase)"""
+    dishName: str
+    allergies: str = "특이사항 없음"
+    cookingLevel: str = "beginner"  # 'beginner' | 'intermediate' | 'advanced'
+    preferences: str = "특이사항 없음"
