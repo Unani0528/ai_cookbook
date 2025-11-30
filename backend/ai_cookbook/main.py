@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 import logging
 import json
+import asyncio
 
 from dotenv import load_dotenv
 
@@ -23,6 +24,7 @@ from models.recipe import (
 )
 from services.chat_service import ChatService
 from services.recipe_generator import RecipeGenerator
+from services.recipe_structure_converter import RecipeStructureConverter
 from services.image_generator import ImageGenerator
 from services.translator import EnglishTranslator
 from langchain_openai import AzureChatOpenAI
@@ -33,6 +35,7 @@ load_dotenv()
 
 chat_service: ChatService = None
 recipe_gen: RecipeGenerator = None
+recipe_converter: RecipeStructureConverter = None
 image_gen: ImageGenerator = None
 english_translator: EnglishTranslator = None
 
@@ -47,7 +50,7 @@ def get_session_history(session_id: str) -> InMemoryChatMessageHistory:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """앱 시작/종료 시 리소스 관리"""
-    global chat_service, recipe_gen, image_gen, english_translator
+    global chat_service, recipe_gen, recipe_converter, image_gen, english_translator
     try:
         logger.info("Initializing ChatService...")
         chat_service = ChatService()
@@ -71,6 +74,12 @@ async def lifespan(app: FastAPI):
         image_gen = ImageGenerator()
         english_translator = EnglishTranslator(model)
         recipe_gen = RecipeGenerator(with_message_history, model)
+
+        # 레시피 구조 변환 서비스 초기화 (Upstage Solar2)
+        logger.info("Initializing RecipeStructureConverter...")
+        recipe_converter = RecipeStructureConverter()
+        logger.info("RecipeStructureConverter initialized successfully")
+
         logger.info("RecipeGenerator services initialized successfully")
     except Exception as e:
         logger.error(f"Failed to initialize RecipeGenerator: {e}")
@@ -201,54 +210,94 @@ async def get_session_info(session_id: str):
 
 # ============ 3페이지: 최종 레시피 확정 ============
 
-@app.post("/recipeChat/finalize/{session_id}", response_model=FinalRecipeResponse)
+@app.post("/recipeChat/finalize/{session_id}")
 async def finalize_recipe(session_id: str, request: FinalRecipeRequest):
     """
     2페이지에서 '레시피 확정' 버튼 클릭 시 호출
-    - 현재까지의 대화에서 최종 레시피 확정
+    - 채팅에서 생성된 레시피를 구조화하고 이미지 생성
     """
+    if chat_service is None:
+        raise HTTPException(
+            status_code=503,
+            detail="ChatService is not available."
+        )
+
+    # 1. 채팅에서 생성된 레시피 텍스트 가져오기
     result = chat_service.finalize_recipe(
         session_id=session_id,
         user_confirmation=request.user_confirmation,
     )
     if result is None:
-        raise HTTPException(status_code=404, detail="세션을 찾을 수 없습니다.")
-    content = result['recipe_content']
-    
-    # content = {
-    #         "title": "레시피 제목",
-    #         "servings": 3,
-    #         "cookTime": 30,
-    #         "ingredients": [
-    #             {
-    #                 "category": "주재료",
-    #                 "items": ["주재료1", "주재료2"]
-    #             },
-    #             {
-    #                 "category": "향신료",
-    #                 "items": ["향신료1", "향신료2"]
-    #             }],
-    #             "steps": [
-    #                 {
-    #                     "step": 3,
-    #                     "description": "<조리 순서 설명>",
-    #                     "image": "<조리 순서 이미지 URL>"
-    #                 }
-    #             ],
-    #         "tips": [
-    #             "알레르기 정보: <입력받은 알레르기 정보를 고려하여 레시피에 적용된 사항>",
-    #             "초보자를 위한 팁: <초보자를 위한 팁>",
-    #             "보관 방법: <권장하는 보관 방법>"
-    #             ]
-    #         }
+        raise HTTPException(status_code=404, detail="레시피를 찾을 수 없습니다.")
 
-    return FinalRecipeResponse(
-        session_id=session_id,
-        recipe_name=result["recipe_name"],
-        recipe_content=content,
-        image_prompt=result["image_prompt"],
-        is_finalized=True,
-    )
+    recipe_text = result['recipe_content']
+    recipe_name = result['recipe_name']
+
+    # 2. 세션 정보 가져오기
+    session_info = chat_service.get_session_info(session_id)
+    if session_info is None:
+        raise HTTPException(status_code=404, detail="세션을 찾을 수 없습니다.")
+
+    try:
+        # 3. 채팅 레시피 텍스트를 구조화된 JSON으로 변환 (Upstage Solar2 사용)
+        logger.info(f"Converting recipe text to structured format using Upstage Solar2...")
+        logger.info(f"Recipe text: {recipe_text[:200]}...")
+
+        structured_recipe = await recipe_converter.convert_to_structure(
+            recipe_text=recipe_text,
+            dish_name=recipe_name,
+            user_info=session_info
+        )
+
+        logger.info("Successfully converted recipe to structured format")
+
+        # 4. 메인 이미지 생성 (레시피 전체 컨텍스트 반영)
+        logger.info("Generating main image prompt with recipe context...")
+        main_image_prompt = await recipe_gen._generate_main_image_prompt(
+            RecipeRequest(
+                dishName=recipe_name,
+                allergies=", ".join(session_info.get('allergy', [])) if session_info.get('allergy') else "특이사항 없음",
+                cookingLevel=session_info.get('cooking_level', 'beginner'),
+                preferences=session_info.get('preferences', '특이사항 없음')
+            ),
+            structured_recipe
+        )
+        logger.info(f"Main image prompt (KR): {main_image_prompt}")
+        eng_main_prompt = await english_translator.translate(main_image_prompt)
+        logger.info(f"Main image prompt (EN): {eng_main_prompt}")
+        # 동기 함수를 비동기로 실행하여 이미지 생성이 완료될 때까지 대기
+        structured_recipe['image'] = await asyncio.to_thread(
+            image_gen.generate_image, eng_main_prompt
+        )
+
+        # 5. 단계별 이미지 생성 (각 단계의 컨텍스트 반영)
+        for idx, step in enumerate(structured_recipe.get('steps', [])):
+            logger.info(f"Generating step {idx + 1} image prompt...")
+            step_image_prompt = await recipe_gen._generate_step_image_prompt(
+                RecipeRequest(
+                    dishName=recipe_name,
+                    allergies=", ".join(session_info.get('allergy', [])) if session_info.get('allergy') else "특이사항 없음",
+                    cookingLevel=session_info.get('cooking_level', 'beginner'),
+                    preferences=session_info.get('preferences', '특이사항 없음')
+                ),
+                structured_recipe,
+                step,
+                idx
+            )
+            logger.info(f"Step {idx + 1} image prompt (KR): {step_image_prompt}")
+            eng_step_prompt = await english_translator.translate(step_image_prompt)
+            logger.info(f"Step {idx + 1} image prompt (EN): {eng_step_prompt}")
+            # 동기 함수를 비동기로 실행하여 이미지 생성이 완료될 때까지 대기
+            step['image'] = await asyncio.to_thread(
+                image_gen.generate_image, eng_step_prompt
+            )
+
+        logger.info("Recipe finalized with images successfully")
+        return structured_recipe
+
+    except Exception as e:
+        logger.error(f"Recipe finalization failed: {e}")
+        raise HTTPException(status_code=500, detail=f"레시피 확정 실패: {str(e)}")
 
 
 @app.get("/recipeChat/recipe/{session_id}", response_model=FinalRecipeResponse)

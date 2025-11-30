@@ -28,6 +28,7 @@ const ChatPage: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isGeneratingRecipe, setIsGeneratingRecipe] = useState<boolean>(false);
   const [formData, setFormData] = useState<RecipeFormData | null>(null);
 
   // 세션 ID 및 formData 가져오기 (1페이지에서 전달받음)
@@ -114,24 +115,21 @@ const ChatPage: React.FC = () => {
 
   // 레시피 확정 버튼
   const handleFinalizeRecipe = async () => {
-    if (!formData) {
-      alert('레시피 정보가 없습니다. 처음부터 다시 시작해주세요.');
+    if (!sessionId) {
+      alert('세션 정보가 없습니다. 처음부터 다시 시작해주세요.');
       navigate('/');
       return;
     }
 
-    setIsLoading(true);
+    setIsGeneratingRecipe(true);
 
     try {
-      // /api/generate-recipe 엔드포인트 호출
-      const response = await fetch('http://localhost:8000/api/generate-recipe', {
+      // 세션 기반 레시피 확정 API 호출 (채팅 내용을 구조화 + 이미지 생성)
+      const response = await fetch(`http://localhost:8000/recipeChat/finalize/${sessionId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          dishName: formData.dishName,
-          allergies: formData.allergies || '특이사항 없음',
-          cookingLevel: formData.cookingLevel || 'beginner',
-          preferences: formData.preferences || '특이사항 없음',
+          user_confirmation: '이 레시피로 확정할게요',
         }),
       });
 
@@ -145,7 +143,6 @@ const ChatPage: React.FC = () => {
       // 3페이지로 이동 (최종 레시피 페이지)
       navigate('/recipe-result', {
         state: {
-          sessionId,
           recipe: data,
         },
       });
@@ -153,7 +150,7 @@ const ChatPage: React.FC = () => {
       console.error('레시피 생성 오류:', error);
       alert('레시피 생성 중 오류가 발생했습니다.');
     } finally {
-      setIsLoading(false);
+      setIsGeneratingRecipe(false);
     }
   };
 
@@ -255,7 +252,27 @@ const ChatPage: React.FC = () => {
   };
 
   return (
-    <div className="h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex flex-col overflow-hidden">
+    <div className="h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex flex-col overflow-hidden relative">
+      {/* 레시피 생성 중 로딩 오버레이 */}
+      {isGeneratingRecipe && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-4 text-center">
+            <Loader2 className="w-16 h-16 animate-spin text-purple-500 mx-auto mb-4" />
+            <h3 className="text-xl font-bold text-gray-900 mb-2">레시피 생성 중...</h3>
+            <p className="text-gray-600 mb-4">
+              채팅 내용을 기반으로 레시피를 구조화하고 이미지를 생성하고 있습니다.
+            </p>
+            <div className="bg-purple-50 rounded-lg p-4 text-sm text-purple-900">
+              <p className="font-semibold mb-1">예상 소요 시간: 1~2분</p>
+              <p className="text-xs">단계별 이미지를 생성하는 중입니다. 잠시만 기다려주세요.</p>
+            </div>
+            <div className="mt-4 text-xs text-gray-500">
+              이 창을 닫지 마시고 기다려주세요...
+            </div>
+          </div>
+        </div>
+      )}
+
       <Header />
 
       <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col min-h-0">
@@ -363,11 +380,11 @@ const ChatPage: React.FC = () => {
             <div className="mt-3 pt-3 border-t border-gray-200">
               <button
                 onClick={handleFinalizeRecipe}
-                disabled={messages.length === 0 || isLoading}
+                disabled={messages.length === 0 || isLoading || isGeneratingRecipe}
                 className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:from-gray-300 disabled:to-gray-400 text-white font-semibold py-3 px-6 rounded-xl shadow-lg hover:shadow-xl transition disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                {isLoading && <Loader2 className="w-5 h-5 animate-spin" />}
-                {isLoading ? '레시피 생성 중...(이 작업은 1~2분 정도 소요될 수 있습니다.)' : '이 레시피로 확정하기'}
+                <ChefHat className="w-5 h-5" />
+                <span>이 레시피로 확정하기</span>
               </button>
             </div>
           </div>
