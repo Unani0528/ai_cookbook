@@ -46,7 +46,7 @@ const Form: React.FC<FormProps> = ({ formData, onInputChange, onCookingLevelChan
               placeholder="예: 땅콩, 갑각류, 유제품"
               className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent outline-none transition"
             />
-            <p className="mt-2 text-sm text-gray-500">알레르기가 있는 재료를 쉼표로 구분하여 입력해주세요</p>
+            <p className="mt-2 text-sm text-gray-500">알레르기가 있는 재료를 입력해주세요</p>
           </div>
 
           <div>
@@ -108,7 +108,7 @@ const Form: React.FC<FormProps> = ({ formData, onInputChange, onCookingLevelChan
                   onSubmit();
                 }
               }}
-              placeholder="예: 비건 칠리, 김치찌개, 파스타"
+              placeholder="예: 간장불고기, 김치찌개, 파스타"
               className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition text-lg"
             />
           </div>
@@ -117,7 +117,7 @@ const Form: React.FC<FormProps> = ({ formData, onInputChange, onCookingLevelChan
         <div className="bg-cyan-50 border border-cyan-200 rounded-xl p-4 flex gap-3">
           <AlertCircle className="w-5 h-5 text-cyan-600 flex-shrink-0 mt-0.5" />
           <div className="text-sm text-cyan-900">
-            <strong className="font-semibold">참고:</strong> AI가 입력하신 정보를 분석하여 최적의 레시피와 단계별 이미지를 생성합니다. 생성에는 약 30초에서 1분 정도 소요됩니다.
+            <strong className="font-semibold">참고:</strong> AI가 입력하신 정보를 분석하여 최적의 레시피를 생성합니다.
           </div>
         </div>
 
