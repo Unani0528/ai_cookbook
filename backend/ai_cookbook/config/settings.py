@@ -7,12 +7,7 @@ load_dotenv()
 
 
 class Settings(BaseSettings):
-    # Azure OpenAI 설정 (기존 레거시 지원용, 선택적)
-    openai_api_key: str
-    deployment_name: str
-    endpoint_url: str
-
-    # Upstage LLM 설정 (새로운 RAG 시스템용)
+    # LLM 설정
     llm_api_key: str
     llm_base_url: str
     llm_model: str

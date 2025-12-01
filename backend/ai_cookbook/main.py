@@ -27,7 +27,7 @@ from services.recipe_generator import RecipeGenerator
 from services.recipe_structure_converter import RecipeStructureConverter
 from services.image_generator import ImageGenerator
 from services.translator import EnglishTranslator
-from langchain_openai import AzureChatOpenAI
+from langchain_openai import ChatOpenAI
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_core.chat_history import InMemoryChatMessageHistory
 
@@ -63,11 +63,10 @@ async def lifespan(app: FastAPI):
     try:
         # 레시피 생성 서비스 초기화
         logger.info("Initializing RecipeGenerator services...")
-        model = AzureChatOpenAI(
-            azure_deployment=settings.deployment_name,
-            api_key=settings.openai_api_key,
-            azure_endpoint=settings.endpoint_url,
-            api_version="2024-02-15-preview",
+        model = ChatOpenAI(
+            model=settings.llm_model,
+            api_key=settings.llm_api_key,
+            base_url=settings.llm_base_url,
             temperature=0.0,
         )
         with_message_history = RunnableWithMessageHistory(model, get_session_history)
